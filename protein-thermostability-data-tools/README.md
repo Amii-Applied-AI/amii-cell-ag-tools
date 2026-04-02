@@ -16,11 +16,11 @@ The resulting dataset provides the essential foundation for safety evaluation, p
 
 ## Flow
 
-1- Run Column_extranction-DeepSeek.py → first version (one row per TM variant)
+1- Run Column_extraction-DeepSeek.py → first version (one row per TM variant)
 
 2- Do manual checks → make manual_tms.csv
 
-3- Run Column_extranction-GPT → refined version that uses your reviewed TMs
+3- Run Column_extraction-GPT → refined version that uses your reviewed TMs
 
 4- Validation ( run consistency-check.py and consistency-check-regex-rules.py to get flagged for inconsistencies )
 
