@@ -1,0 +1,27 @@
+# Active-learning surrogate competition — direct dependencies
+# Pinned to the versions used to produce the published Bioinformatics paper
+# results (Python 3.10.12).
+#
+# Install:
+#     python3.10 -m venv venv
+#     source venv/bin/activate
+#     pip install -r requirements.txt
+#
+# Notes:
+#   - PyTorch is only required by the Bayesian-NN surrogate (`run_bnn.py`,
+#     `MCDropoutBNN` in utils/harder_surrogates.py). The classical GP / RF /
+#     NN surrogates only need scikit-learn.
+#   - The pinned torch build is CUDA 12.8 — install a CPU/other CUDA build
+#     separately if your machine differs.
+
+numpy==2.2.6
+scipy==1.15.3
+pandas==2.3.3
+scikit-learn==1.7.2
+matplotlib==3.10.8
+seaborn==0.13.2
+joblib==1.5.3
+tqdm==4.67.3
+
+# Bayesian neural net surrogate (optional — only needed for run_bnn.py)
+torch==2.10.0

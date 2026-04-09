@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite both the software and the accompanying paper."
+title: "Active-Learning Surrogate Competition for Cell-Media Titer Optimisation"
+abstract: >-
+  Code accompanying the Bioinformatics submission "Benchmarking active-learning
+  surrogates for cell-media titer optimisation". Implements two competition
+  protocols (Hide-the-Label and Open-Race) under two difficulty regimes
+  (Regular Mode and Hard Mode) across six published cell-culture / cell-media
+  datasets, with surrogate families spanning Gaussian processes, random
+  forests, neural networks, and Bayesian neural networks, and a wide pool of
+  acquisition strategies (BO, DOE, evolutionary, random, knee-rule, etc.).
+authors:
+  - family-names: "Parsaee"
+    given-names: "Ali"
+type: software
+license: MIT
+version: "1.0.0"
+date-released: "2026-04-08"
+keywords:
+  - active learning
+  - Bayesian optimisation
+  - surrogate models
+  - cell media optimisation
+  - bioprocess optimisation
+  - benchmark
+  - reproducibility
+preferred-citation:
+  type: article
+  title: "Benchmarking active-learning surrogates for cell-media titer optimisation"
+  authors:
+    - family-names: "Parsaee"
+      given-names: "Ali"
+  journal: "Bioinformatics"
+  year: 2026
+# After uploading to Zenodo, add the DOI here:
+# doi: 10.5281/zenodo.XXXXXXX

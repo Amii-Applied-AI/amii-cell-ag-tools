@@ -1,0 +1,29 @@
+{
+  "title": "Active-Learning Surrogate Competition for Cell-Media Titer Optimisation — Reproducibility Package",
+  "description": "<p>Minimal code package accompanying the Bioinformatics paper <em>Benchmarking active-learning surrogates for cell-media titer optimisation</em>. Implements two competition protocols (Hide-the-Label and Open-Race) under two difficulty regimes (Regular and Hard) across six published cell-culture / cell-media datasets, with surrogate families spanning Gaussian processes, random forests, neural networks, and Bayesian neural networks. Bundled with the six input datasets. Post-processed JSON results and raw tournament logs are not bundled — they can be regenerated from the runner scripts in <code>run_*.py</code>.</p>",
+  "upload_type": "software",
+  "license": "MIT",
+  "access_right": "open",
+  "creators": [
+    {
+      "name": "Parsaee, Ali",
+      "affiliation": ""
+    }
+  ],
+  "keywords": [
+    "active learning",
+    "Bayesian optimisation",
+    "surrogate models",
+    "cell media optimisation",
+    "bioprocess optimisation",
+    "benchmark",
+    "reproducibility"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/AliParsaee1/AL_Project",
+      "relation": "isSupplementTo",
+      "resource_type": "software"
+    }
+  ]
+}
