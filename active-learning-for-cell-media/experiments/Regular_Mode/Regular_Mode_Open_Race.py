@@ -693,26 +693,36 @@ class OpenRaceCompetition:
             raise ValueError("No optimizers support continuous optimization for open race game")
         
         logger.info(f"Selected {len(optimizers)} optimizers: {[opt.name for opt in optimizers]}")
-        
+
+        # Capture optimizer names so each competition can re-instantiate fresh
+        # optimizers with a per-competition seed. Reusing the same optimizer
+        # instances across competitions left internal RNG state unreset and
+        # produced identical query sequences across competitions.
+        selected_names = [opt.name for opt in optimizers]
+
         # Fit GP model once
         gp_model, scaler = self.fit_surrogate_model(X, y, y_var, dataset_name, use_cache_model=use_cache_model)
-        
+
         # Create black box function
         black_box = self.create_black_box_function(gp_model, scaler, X, noise_std)
-        
+
         # Run competitions
         start_time = time.time()
-        
+
         def run_competition_with_seed(seed, comp_idx=None, total_comps=None):
             local_competition = OpenRaceCompetition(random_state=seed)
             local_black_box = BlackBoxFunction(gp_model, scaler, black_box.get_bounds(), noise_std)
-            
+
+            from utils.open_race_optimizers import get_open_race_optimizers
+            local_pool = get_open_race_optimizers(random_state=seed)
+            local_optimizers = [local_pool[name] for name in selected_names if name in local_pool]
+
             if comp_idx is not None and total_comps is not None:
                 logger.info(f"Starting Competition {comp_idx+1}/{total_comps}")
-            
+
             result = local_competition.run_single_competition(
                 black_box=local_black_box,
-                optimizers=optimizers,
+                optimizers=local_optimizers,
                 S=S,
                 R=R,
                 B=B,

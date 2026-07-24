@@ -942,11 +942,10 @@ class HideLabelCompetitionIncrementalGP:
             """Run a single optimizer on its own copy of the competition state. Thread-safe."""
             import time as _time
             _t0 = _time.monotonic()
-            # Hardcoded fallback: cap random-walk optimizers that gain nothing from extra steps.
-            # These optimizers are pure random walks in HTL mode — extra steps add no value.
-            # The cap is applied unconditionally; it only matters when max_steps wasn't already
-            # set via _optimizer_max_steps (env var or module-level dict).
-            _DEFAULT_CAP_RANDOM = 60
+            # Safety limit for the pure random-walk optimizers (RANDOM, DE_DIRECT)
+            # when no explicit max_steps is set, so a run cannot loop indefinitely.
+            # Set high enough that it never truncates the natural steps-to-target.
+            _DEFAULT_CAP_RANDOM = 100000
             if max_steps is None and optimizer_name in ('RANDOM', 'DE_DIRECT'):
                 max_steps = _DEFAULT_CAP_RANDOM
             # Each optimizer gets its own RNG for deterministic fallback sampling
@@ -966,8 +965,7 @@ class HideLabelCompetitionIncrementalGP:
             optimization_history = []
 
             while not found_target and len(hidden_indices) > 0 and (max_steps is None or steps_to_target < max_steps):
-                # Emergency hard cap: RANDOM/DE_DIRECT are pure random walks — never exceed 60 steps
-                if optimizer_name in ('RANDOM', 'DE_DIRECT') and steps_to_target >= 60:
+                if optimizer_name in ('RANDOM', 'DE_DIRECT') and steps_to_target >= 100000:
                     break
                 current_best_local = float(np.max(y_observed)) if len(y_observed) > 0 else float('-inf')
                 actual_batch_size = min(batch_size, len(hidden_indices))

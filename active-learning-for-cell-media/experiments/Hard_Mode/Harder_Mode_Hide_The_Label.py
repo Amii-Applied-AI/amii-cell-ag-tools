@@ -353,18 +353,28 @@ class HarderHideLabelCompetition(HideLabelCompetitionIncrementalGP):
         else:
             seed_to_use = synthetic_seed
         
-        # Generate Latin Hypercube design
-        sampler = qmc.LatinHypercube(d=original_X.shape[1], seed=seed_to_use)
-        X_pool = sampler.random(n_points)
-        
-        # Scale to match original data range
-        X_min = np.min(original_X, axis=0)
-        X_max = np.max(original_X, axis=0)
-        X_pool = X_min + (X_max - X_min) * X_pool
-        
-        # Sample function values from harder surrogate model (surrogate scales internally)
-        y_pool = surrogate_model.sample_y(X_pool, 1, random_state=seed_to_use).flatten()
-        
+        # Manifold candidate pool: draw points near the real data by resampling
+        # observed formulations and adding a small Gaussian jitter (jitter * per-
+        # feature std), instead of filling the full feature box with a Latin
+        # hypercube. In high dimensions a box-filling pool lands mostly far from any
+        # training point, where the surrogate has no signal, so the pool maximum is
+        # an unlearnable noise spike. Points are scored with the surrogate mean (the
+        # true landscape) rather than a single random posterior draw.
+        jitter = 0.15
+        rng = np.random.RandomState(seed_to_use)
+        n_obs, n_dim = original_X.shape
+        std = original_X.std(axis=0, keepdims=True) + 1e-9
+        X_pool = (original_X[rng.randint(0, n_obs, n_points)]
+                  + rng.normal(0, 1, size=(n_points, n_dim)) * std * jitter)
+        X_pool = np.clip(X_pool, original_X.min(0), original_X.max(0))
+
+        y_pool = surrogate_model.predict(X_pool)
+        if isinstance(y_pool, tuple):
+            y_pool = y_pool[0]
+        if getattr(surrogate_model, "noise_level", 0) > 0:
+            y_pool = surrogate_model.add_noise(y_pool, X_pool, rng=rng)
+        y_pool = np.asarray(y_pool).flatten()
+
         self._log_timing("Finished harder candidate pool generation")
         return X_pool, y_pool
     
@@ -423,7 +433,7 @@ def run_harder_competition(dataset_name: str,
         Tuple of (tournament_results, analysis)
     """
     
-    print("🔥 HARDER HIDE-THE-LABEL COMPETITION")
+    print("HARDER HIDE-THE-LABEL COMPETITION")
     print("="*80)
     print(f"Dataset: {dataset_name}")
     print(f"Surrogate: {surrogate_type}")
@@ -518,6 +528,7 @@ def run_harder_competition(dataset_name: str,
             X_pool=X_pool,
             y_pool=y_pool,
             competition_start=competition_start,
+            synthetic_dataset_index=synth_idx,
         )
         
         # Sparse progress: log tournament completion time

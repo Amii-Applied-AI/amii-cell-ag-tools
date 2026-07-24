@@ -301,7 +301,7 @@ class StatisticalAnalyzer:
                 'N_Instances': len(common_instances)
             })
         
-        print(f"    Progress: {total_pairs}/{total_pairs} ✓")
+        print(f"    Progress: {total_pairs}/{total_pairs} done")
         return pd.DataFrame(results)
     
     def holm_bonferroni_correction(self, pairwise_df: pd.DataFrame) -> pd.DataFrame:
@@ -525,7 +525,7 @@ class StatisticalAnalyzer:
         md += "|-------------|-------------|-----------|---------|--------------|--------|-------------|\n"
         
         for idx, row in pairwise.iterrows():
-            sig = "✓" if row['Adjusted_P_Value'] < 0.05 else ""
+            sig = "*" if row['Adjusted_P_Value'] < 0.05 else ""
             md += f"| {row['Optimizer_A']} | {row['Optimizer_B']} | "
             md += f"{row['HL_Median']:.4f} | {row['P_Value']:.6f} | "
             md += f"{row['Adjusted_P_Value']:.6f} | "

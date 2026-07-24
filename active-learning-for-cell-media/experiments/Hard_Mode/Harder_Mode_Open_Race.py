@@ -535,14 +535,20 @@ class HarderOpenRaceCompetition(OpenRaceCompetition):
             raise ValueError("No optimizers support continuous optimization for open race game")
         
         logger.info(f"Selected {len(optimizers)} optimizers: {[opt.name for opt in optimizers]}")
-        
+
+        # Capture optimizer names so each competition can re-instantiate fresh
+        # optimizers with a per-competition seed. Reusing the same optimizer
+        # instances across competitions left internal RNG state unreset and
+        # produced identical query sequences across competitions.
+        selected_names = [opt.name for opt in optimizers]
+
         # Run competitions
         start_time = time.time()
-        
+
         def run_competition_with_seed(seed, comp_idx=None, total_comps=None):
             if comp_idx is not None and total_comps is not None:
                 logger.info(f"Starting Competition {comp_idx+1}/{total_comps}")
-            
+
             # Create a fresh black box per competition for isolation and seeded noise
             local_black_box = HarderBlackBoxFunction(
                 surrogate_model=black_box.surrogate_model,
@@ -551,10 +557,15 @@ class HarderOpenRaceCompetition(OpenRaceCompetition):
                 difficulty_config=self.difficulty_config,
                 random_state=seed
             )
-            
+
+            # Re-instantiate optimizers per-competition with the comp seed so
+            # each competition draws independent stochastic samples.
+            local_pool = get_harder_optimizers(random_state=seed)
+            local_optimizers = [local_pool[name] for name in selected_names if name in local_pool]
+
             result = self.run_single_competition(
                 black_box=local_black_box,
-                optimizers=optimizers,
+                optimizers=local_optimizers,
                 S=S,
                 R=R,
                 B=B,

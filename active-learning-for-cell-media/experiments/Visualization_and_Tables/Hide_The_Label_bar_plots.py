@@ -116,7 +116,7 @@ def plot_bar(optimizers: List[str], means: List[float], ses: List[float], title:
     errs = [ses[i] for i in order]
 
     plt.figure(figsize=(12, 7))
-    # Apply viridis gradient (purple→blue→green→yellow) explicitly per bar
+    # Apply viridis gradient (purple-blue-green-yellow) explicitly per bar
     try:
         cmap = plt.cm.get_cmap("viridis")
     except Exception:

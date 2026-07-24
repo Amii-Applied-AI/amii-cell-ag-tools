@@ -481,18 +481,53 @@ class HarderGaussianProcessSurrogate(FastSurrogateBase, NoisySurrogateMixin, Mul
                  noise_level: float = 0.1,
                  heteroscedastic: bool = False,
                  n_modes: int = 1,
-                 mode_separation: float = 2.0):
-        from sklearn.gaussian_process import GaussianProcessRegressor
-        from sklearn.gaussian_process.kernels import Matern, WhiteKernel, ConstantKernel
+                 mode_separation: float = 2.0,
+                 ard: bool = True,
+                 n_restarts_optimizer: int = 8,
+                 ls_lower_factor: float = 0.25,
+                 ls_upper_factor: float = 8.0,
+                 white_noise_bounds=(1e-6, 1e-1)):
         FastSurrogateBase.__init__(self, random_state)
         NoisySurrogateMixin.__init__(self, noise_level, heteroscedastic)
         MultiModalSurrogateMixin.__init__(self, n_modes, mode_separation)
-        kernel = ConstantKernel(1.0) * Matern(nu=2.5) + WhiteKernel(noise_level=1e-3)
-        self._gp = GaussianProcessRegressor(
+        self._ard = ard
+        self._n_restarts = int(n_restarts_optimizer)
+        self._ls_lo = float(ls_lower_factor)
+        self._ls_hi = float(ls_upper_factor)
+        self._white_bounds = white_noise_bounds
+        self._gp = None  # built from the data in fit()
+
+    def _build_gp(self, X: np.ndarray):
+        # Length-scale is initialised from the median pairwise distance of the
+        # (standardised) inputs and bounded to a window around it, with ARD and a
+        # capped white-noise term. Without this, in high dimensions the isotropic
+        # length-scale collapses to its floor and the white-noise term absorbs all
+        # the signal, so the GP predicts a constant on unseen points.
+        from sklearn.gaussian_process import GaussianProcessRegressor
+        from sklearn.gaussian_process.kernels import Matern, WhiteKernel, ConstantKernel
+        from scipy.spatial.distance import pdist
+
+        d = X.shape[1]
+        if X.shape[0] > 1:
+            dists = pdist(X)
+            dists = dists[dists > 0]
+            ell0 = float(np.median(dists)) if dists.size else float(np.sqrt(d))
+        else:
+            ell0 = float(np.sqrt(d))
+        if not np.isfinite(ell0) or ell0 <= 0:
+            ell0 = float(np.sqrt(max(d, 1)))
+
+        ls_bounds = (ell0 * self._ls_lo, ell0 * self._ls_hi)
+        length_scale = (ell0 * np.ones(d)) if self._ard else ell0
+        kernel = (ConstantKernel(1.0, (1e-3, 1e3))
+                  * Matern(length_scale=length_scale, nu=2.5, length_scale_bounds=ls_bounds)
+                  + WhiteKernel(noise_level=1e-3, noise_level_bounds=self._white_bounds))
+        self._ell0 = ell0
+        return GaussianProcessRegressor(
             kernel=kernel,
             normalize_y=True,
-            n_restarts_optimizer=3,
-            random_state=random_state,
+            n_restarts_optimizer=self._n_restarts,
+            random_state=self.random_state,
         )
 
     def fit(self, X: np.ndarray, y: np.ndarray, y_var: Optional[np.ndarray] = None) -> 'HarderGaussianProcessSurrogate':
@@ -502,9 +537,12 @@ class HarderGaussianProcessSurrogate(FastSurrogateBase, NoisySurrogateMixin, Mul
             def base_fn(Xb): return np.sum(Xb, axis=1)
             y = self.create_multimodal_function(X, base_fn)
         y_noisy = self.add_noise(y, X, rng=self.np_random)
+        self._gp = self._build_gp(X)
         self._gp.fit(X, y_noisy)
         self.is_fitted = True
-        logger.info(f"HarderGP fitted in {time.time()-start:.3f}s (noise: {self.noise_level}, modes: {self.n_modes})")
+        logger.info(f"GP surrogate fitted in {time.time()-start:.3f}s "
+                    f"(d={X.shape[1]}, length_scale0={self._ell0:.3g}, "
+                    f"noise={self.noise_level}, modes={self.n_modes})")
         return self
 
     def predict(self, X: np.ndarray, return_std: bool = False):
@@ -553,7 +591,7 @@ class _MCDropoutNet(object):
         if self.use_gpu:
             torch.cuda.manual_seed_all(random_state)
 
-        # Build network: input → [hidden + dropout] × N → output
+        # Build network: input -> [hidden + dropout] x N -> output
         layers = []
         prev = input_dim
         for h in hidden_sizes:
@@ -729,6 +767,14 @@ class HarderBayesianNeuralNetworkSurrogate(FastSurrogateBase, NoisySurrogateMixi
     def fit(self, X: np.ndarray, y: np.ndarray, y_var=None) -> 'HarderBayesianNeuralNetworkSurrogate':
         start = time.time()
 
+        # Determinism: this surrogate is fitted once but queried many times per run
+        # (once per synthetic candidate pool). Reseeding here and in predict() below,
+        # plus pinning to a single thread, makes the MC-Dropout draws reproducible
+        # instead of depending on the global torch RNG state left by earlier calls.
+        import torch
+        torch.set_num_threads(1)
+        torch.manual_seed(self.random_state)
+
         if self.n_modes > 1:
             def base_fn(Xb):
                 return np.sum(Xb, axis=1)
@@ -755,6 +801,8 @@ class HarderBayesianNeuralNetworkSurrogate(FastSurrogateBase, NoisySurrogateMixi
         return self
 
     def predict(self, X: np.ndarray, return_std: bool = False):
+        import torch
+        torch.manual_seed(self.random_state)
         y_pred, y_std = self._model.predict(X, return_std=True, n_mc=self.n_mc_samples)
 
         if self.noise_level > 0:
